@@ -136,14 +136,14 @@ namespace winmd::reader
     {
         index_base() noexcept = default;
 
-        index_base(table_base const* const table, T const type, uint32_t const row) noexcept :
-            m_table{ table },
+        index_base(database const& db, T const type, uint32_t const row) noexcept :
+            m_database{ db },
             m_value{ ((row + 1) << coded_index_bits_v<T>) | static_cast<uint32_t>(type) }
         {
         }
 
-        index_base(table_base const* const table, uint32_t const value) noexcept :
-            m_table{ table },
+        index_base(database const& db, uint32_t const value) noexcept :
+            m_database{ db },
             m_value{ value }
         {
         }
@@ -183,12 +183,12 @@ namespace winmd::reader
 
         database const& get_database() const noexcept
         {
-            return m_table->get_database();
+            return m_database;
         }
 
     protected:
 
-        table_base const* m_table{};
+        database const& m_database{};
         uint32_t m_value{};
     };
 
@@ -211,13 +211,13 @@ namespace winmd::reader
     {
         coded_index() noexcept = default;
 
-        coded_index(table_base const* const table, T const type, uint32_t const row) noexcept :
-            typed_index<T>{ table, type, row }
+        coded_index(database const& db, T const type, uint32_t const row) noexcept :
+            typed_index<T>{ db, type, row }
         {
         }
 
-        coded_index(table_base const* const table, uint32_t const value) noexcept :
-            typed_index<T>{ table, value }
+        coded_index(database const& db, uint32_t const value) noexcept :
+            typed_index<T>{ db, value }
         {
         }
     };
@@ -244,7 +244,7 @@ namespace winmd::reader
         template <typename T>
         auto coded_index() const noexcept
         {
-            return reader::coded_index{ m_table, index_tag_v<T, Row>, index() };
+            return reader::coded_index{ m_table->get_database(), index_tag_v<T, Row>, index() };
         }
 
         template <typename T>
@@ -381,7 +381,7 @@ namespace winmd::reader
         template <typename T>
         auto get_coded_index(uint32_t const column) const
         {
-            return reader::coded_index<T>{ m_table, m_table->get_value<uint32_t>(m_index, column) };
+            return reader::coded_index<T>{ m_table->get_database(), m_table->get_value<uint32_t>(m_index, column) };
         }
 
         table_base const* get_table() const noexcept

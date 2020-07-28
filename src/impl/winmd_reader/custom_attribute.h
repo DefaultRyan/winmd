@@ -340,9 +340,8 @@ namespace winmd::reader
 
     struct CustomAttributeSig
     {
-        CustomAttributeSig(table_base const* table, byte_view& data, MethodDefSig const& ctor)
+        CustomAttributeSig(database const& db, byte_view& data, MethodDefSig const& ctor)
         {
-            database const& db = table->get_database();
             auto const prolog = read<uint16_t>(data);
             if (prolog != 0x0001)
             {
@@ -380,6 +379,6 @@ namespace winmd::reader
         auto const ctor = Type();
         MethodDefSig const& method_sig = ctor.type() == CustomAttributeType::MemberRef ? ctor.MemberRef().MethodSignature() : ctor.MethodDef().Signature();
         auto cursor = get_blob(2);
-        return CustomAttributeSig{ get_table(), cursor, method_sig };
+        return CustomAttributeSig{ get_database(), cursor, method_sig };
     }
 }

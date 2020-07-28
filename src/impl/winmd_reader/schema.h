@@ -107,7 +107,7 @@ namespace winmd::reader
         MethodDefSig Signature() const
         {
             auto cursor = get_blob(4);
-            return{ get_table(), cursor };
+            return{ get_database(), cursor };
         }
 
         auto ParamList() const;
@@ -138,7 +138,7 @@ namespace winmd::reader
         MethodDefSig MethodSignature() const
         {
             auto cursor = get_blob(2);
-            return{ get_table(), cursor };
+            return{ get_database(), cursor };
         }
 
         auto CustomAttribute() const;
@@ -173,7 +173,7 @@ namespace winmd::reader
         auto Signature() const
         {
             auto cursor = get_blob(2);
-            return FieldSig{ get_table(), cursor };
+            return FieldSig{ get_database(), cursor };
         }
 
         auto CustomAttribute() const;
@@ -264,7 +264,7 @@ namespace winmd::reader
         TypeSpecSig Signature() const
         {
             auto cursor = get_blob(0);
-            return{ get_table(), cursor };
+            return{ get_database(), cursor };
         }
 
         auto CustomAttribute() const;
@@ -361,7 +361,7 @@ namespace winmd::reader
         PropertySig Type() const
         {
             auto cursor = get_blob(2);
-            return{ get_table(), cursor };
+            return{ get_database(), cursor };
         }
 
         auto MethodSemantic() const;

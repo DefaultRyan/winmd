@@ -70,9 +70,9 @@ namespace winmd::reader
 
     struct CustomModSig
     {
-        CustomModSig(table_base const* table, byte_view& data)
+        CustomModSig(database const& db, byte_view& data)
             : m_cmod(uncompress_enum<ElementType>(data))
-            , m_type(table, uncompress_unsigned(data))
+            , m_type(db, uncompress_unsigned(data))
         {
             XLANG_ASSERT(m_cmod == ElementType::CModReqd || m_cmod == ElementType::CModOpt);
         }
@@ -94,7 +94,7 @@ namespace winmd::reader
 
     struct GenericTypeInstSig
     {
-        GenericTypeInstSig(table_base const* table, byte_view& data);
+        GenericTypeInstSig(database const& db, byte_view& data);
 
         ElementType ClassOrValueType() const noexcept
         {
@@ -123,7 +123,7 @@ namespace winmd::reader
         std::vector<TypeSig> m_generic_args;
     };
 
-    inline std::vector<CustomModSig> parse_cmods(table_base const* table, byte_view& data)
+    inline std::vector<CustomModSig> parse_cmods(database const& db, byte_view& data)
     {
         std::vector<CustomModSig> result;
         auto cursor = data;
@@ -132,13 +132,13 @@ namespace winmd::reader
             element_type == ElementType::CModOpt || element_type == ElementType::CModReqd;
             element_type = uncompress_enum<ElementType>(cursor))
         {
-            result.emplace_back(table, data);
+            result.emplace_back(db, data);
             cursor = data;
         }
         return result;
     }
 
-    inline bool parse_szarray(table_base const*, byte_view& data)
+    inline bool parse_szarray(database const&, byte_view& data)
     {
         auto cursor = data;
         if (uncompress_enum<ElementType>(cursor) == ElementType::SZArray)
@@ -162,11 +162,11 @@ namespace winmd::reader
     struct TypeSig
     {
         using value_type = std::variant<ElementType, coded_index<TypeDefOrRef>, GenericTypeIndex, GenericTypeInstSig, GenericMethodTypeIndex>;
-        TypeSig(table_base const* table, byte_view& data)
-            : m_is_szarray(parse_szarray(table, data))
-            , m_cmod(parse_cmods(table, data))
+        TypeSig(database const& db, byte_view& data)
+            : m_is_szarray(parse_szarray(db, data))
+            , m_cmod(parse_cmods(db, data))
             , m_element_type(parse_element_type(data))
-            , m_type(ParseType(table, data))
+            , m_type(ParseType(db, data))
         {}
 
         value_type const& Type() const noexcept
@@ -191,7 +191,7 @@ namespace winmd::reader
             return uncompress_enum<ElementType>(cursor);
         }
 
-        static value_type ParseType(table_base const* table, byte_view& data);
+        static value_type ParseType(database const& db, byte_view& data);
         bool m_is_szarray;
         std::vector<CustomModSig> m_cmod;
         ElementType m_element_type;
@@ -216,10 +216,10 @@ namespace winmd::reader
 
     struct ParamSig
     {
-        ParamSig(table_base const* table, byte_view& data)
-            : m_cmod(parse_cmods(table, data))
+        ParamSig(database const& db, byte_view& data)
+            : m_cmod(parse_cmods(db, data))
             , m_byref(is_by_ref(data))
-            , m_type(table, data)
+            , m_type(db, data)
         {
         }
 
@@ -246,8 +246,8 @@ namespace winmd::reader
 
     struct RetTypeSig
     {
-        RetTypeSig(table_base const* table, byte_view& data)
-            : m_cmod(parse_cmods(table, data))
+        RetTypeSig(database const& db, byte_view& data)
+            : m_cmod(parse_cmods(db, data))
             , m_byref(is_by_ref(data))
         {
             auto cursor = data;
@@ -258,7 +258,7 @@ namespace winmd::reader
             }
             else
             {
-                m_type.emplace(table, data);
+                m_type.emplace(db, data);
             }
         }
 
@@ -290,11 +290,11 @@ namespace winmd::reader
 
     struct MethodDefSig
     {
-        MethodDefSig(table_base const* table, byte_view& data)
+        MethodDefSig(database const& db, byte_view& data)
             : m_calling_convention(uncompress_enum<CallingConvention>(data))
             , m_generic_param_count(enum_mask(m_calling_convention, CallingConvention::Generic) == CallingConvention::Generic ? uncompress_unsigned(data) : 0)
             , m_param_count(uncompress_unsigned(data))
-            , m_ret_type(table, data)
+            , m_ret_type(db, data)
         {
             if (m_param_count > data.size())
             {
@@ -303,7 +303,7 @@ namespace winmd::reader
             m_params.reserve(m_param_count);
             for (uint32_t count = 0; count < m_param_count; ++count)
             {
-                m_params.emplace_back(table, data);
+                m_params.emplace_back(db, data);
             }
         }
 
@@ -337,10 +337,10 @@ namespace winmd::reader
 
     struct FieldSig
     {
-        FieldSig(table_base const* table, byte_view& data)
+        FieldSig(database const& db, byte_view& data)
             : m_calling_convention(check_convention(data))
-            , m_cmod(parse_cmods(table, data))
-            , m_type(table, data)
+            , m_cmod(parse_cmods(db, data))
+            , m_type(db, data)
         {}
 
         auto CustomMod() const noexcept
@@ -370,11 +370,11 @@ namespace winmd::reader
 
     struct PropertySig
     {
-        PropertySig(table_base const* table, byte_view& data)
+        PropertySig(database const& db, byte_view& data)
             : m_calling_convention(check_convention(data))
             , m_param_count(uncompress_unsigned(data))
-            , m_cmod(parse_cmods(table, data))
-            , m_type(table, data)
+            , m_cmod(parse_cmods(db, data))
+            , m_type(db, data)
         {
             if (m_param_count > data.size())
             {
@@ -383,7 +383,7 @@ namespace winmd::reader
             m_params.reserve(m_param_count);
             for (uint32_t count = 0; count < m_param_count; ++count)
             {
-                m_params.emplace_back(table, data);
+                m_params.emplace_back(db, data);
             }
         }
 
@@ -416,8 +416,8 @@ namespace winmd::reader
 
     struct TypeSpecSig
     {
-        TypeSpecSig(table_base const* table, byte_view& data)
-            : m_type(ParseType(table, data))
+        TypeSpecSig(database const& db, byte_view& data)
+            : m_type(ParseType(db, data))
         {
         }
 
@@ -427,18 +427,18 @@ namespace winmd::reader
         }
 
     private:
-        static GenericTypeInstSig ParseType(table_base const* table, byte_view& data)
+        static GenericTypeInstSig ParseType(database const& db, byte_view& data)
         {
             [[maybe_unused]] auto element_type = uncompress_enum<ElementType>(data);
             XLANG_ASSERT(element_type == ElementType::GenericInst);
-            return { table, data };
+            return { db, data };
         }
         GenericTypeInstSig m_type;
     };
 
-    inline GenericTypeInstSig::GenericTypeInstSig(table_base const* table, byte_view& data)
+    inline GenericTypeInstSig::GenericTypeInstSig(database const& db, byte_view& data)
         : m_class_or_value(uncompress_enum<ElementType>(data))
-        , m_type(table, uncompress_unsigned(data))
+        , m_type(db, uncompress_unsigned(data))
         , m_generic_arg_count(uncompress_unsigned(data))
     {
         if (!(m_class_or_value == ElementType::Class || m_class_or_value == ElementType::ValueType))
@@ -453,11 +453,11 @@ namespace winmd::reader
         m_generic_args.reserve(m_generic_arg_count);
         for (uint32_t arg = 0; arg < m_generic_arg_count; ++arg)
         {
-            m_generic_args.emplace_back(table, data);
+            m_generic_args.emplace_back(db, data);
         }
     }
 
-    inline TypeSig::value_type TypeSig::ParseType(table_base const* table, byte_view& data)
+    inline TypeSig::value_type TypeSig::ParseType(database const& db, byte_view& data)
     {
         auto element_type = uncompress_enum<ElementType>(data);
         switch (element_type)
@@ -483,11 +483,11 @@ namespace winmd::reader
 
         case ElementType::Class:
         case ElementType::ValueType:
-            return coded_index<TypeDefOrRef>{ table, uncompress_unsigned(data) };
+            return coded_index<TypeDefOrRef>{ db, uncompress_unsigned(data) };
             break;
 
         case ElementType::GenericInst:
-            return GenericTypeInstSig{ table, data };
+            return GenericTypeInstSig{ db, data };
             break;
 
         case ElementType::Var:
