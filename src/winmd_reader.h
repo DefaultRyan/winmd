@@ -3,6 +3,7 @@
 #include "impl/base.h"
 #include "impl/winmd_reader/pe.h"
 #include "impl/winmd_reader/view.h"
+#include "impl/winmd_reader/heap.h"
 #include "impl/winmd_reader/enum.h"
 #include "impl/winmd_reader/enum_traits.h"
 #include "impl/winmd_reader/flags.h"

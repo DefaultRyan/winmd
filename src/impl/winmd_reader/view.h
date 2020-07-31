@@ -59,6 +59,11 @@ namespace winmd::reader
         {
         }
 
+        byte_view(std::vector<uint8_t> const& v) noexcept :
+            byte_view(v.data(), v.data() + v.size())
+        {
+        }
+
         auto begin() const noexcept
         {
             return m_first;
@@ -138,6 +143,17 @@ namespace winmd::reader
         uint8_t const* m_first{};
         uint8_t const* m_last{};
     };
+
+    inline bool operator==(byte_view const& lhs, byte_view const& rhs) noexcept
+    {
+        return lhs.size() == rhs.size() && 
+            (lhs.begin() == rhs.begin() || std::equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end()));
+    }
+
+    inline bool operator!=(byte_view const& lhs, byte_view const& rhs) noexcept
+    {
+        return !(lhs == rhs);
+    }
 
     struct file_view : byte_view
     {

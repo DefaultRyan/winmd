@@ -10,9 +10,20 @@ namespace winmd::reader
             return get_coded_index<reader::ResolutionScope>(0);
         }
 
+        void ResolutionScope(reader::coded_index<reader::ResolutionScope> const& value)
+        {
+            put_coded_index(0, value);
+        }
+
         auto TypeName() const
         {
             return get_string(1);
+        }
+
+        template <typename T>
+        void TypeName(T&& value)
+        {
+            put_string(1, std::forward<T>(value));
         }
 
         auto TypeNamespace() const
@@ -20,8 +31,16 @@ namespace winmd::reader
             return get_string(2);
         }
 
+        template <typename T>
+        void TypeNamespace(T&& value)
+        {
+            put_string(2, std::forward<T>(value));
+        }
+
         auto CustomAttribute() const;
     };
+
+    struct CustomAttributeSig;
 
     struct CustomAttribute : row_base<CustomAttribute>
     {
@@ -32,12 +51,24 @@ namespace winmd::reader
             return get_coded_index<HasCustomAttribute>(0);
         }
 
+        void Parent(reader::coded_index<HasCustomAttribute> const& value)
+        {
+            put_coded_index(0, value);
+        }
+
         auto Type() const
         {
             return get_coded_index<CustomAttributeType>(1);
         }
 
+        void Type(reader::coded_index<CustomAttributeType> const& value)
+        {
+            put_coded_index(1, value);
+        }
+
         auto Value() const;
+
+        void Value(CustomAttributeSig const& value);
 
         auto TypeNamespaceAndName() const;
     };
@@ -51,9 +82,20 @@ namespace winmd::reader
             return TypeAttributes{{ get_value<uint32_t>(0) }};
         }
 
+        void Flags(TypeAttributes const& value)
+        {
+            put_value(0, value.value);
+        }
+
         auto TypeName() const
         {
             return get_string(1);
+        }
+
+        template <typename T>
+        void TypeName(T&& str)
+        {
+            put_string(1, std::forward<T>(str));
         }
 
         auto TypeNamespace() const
@@ -61,13 +103,27 @@ namespace winmd::reader
             return get_string(2);
         }
 
+        template <typename T>
+        void TypeNamespace(T&& str)
+        {
+            put_string(2, std::forward<T>(str));
+        }
+
         auto Extends() const
         {
             return get_coded_index<TypeDefOrRef>(3);
         }
 
+        void Extends(reader::coded_index<TypeDefOrRef> const& value)
+        {
+            put_coded_index(3, value);
+        }
+
         auto FieldList() const;
         auto MethodList() const;
+
+        void FieldList(Field const& value);
+        auto MethodList(MethodDef const& value);
 
         auto CustomAttribute() const;
         auto InterfaceImpl() const;
@@ -89,9 +145,19 @@ namespace winmd::reader
             return get_value<uint32_t>(0);
         }
 
+        void RVA(uint32_t value)
+        {
+            put_value(0, value);
+        }
+
         auto ImplFlags() const
         {
             return MethodImplAttributes{{ get_value<uint16_t>(1) }};
+        }
+
+        void ImplFlags(MethodImplAttributes const& value)
+        {
+            put_value(1, value.value);
         }
 
         auto Flags() const
@@ -99,9 +165,20 @@ namespace winmd::reader
             return MethodAttributes{{ get_value<uint16_t>(2) }};
         }
 
+        void Flags(MethodAttributes const& value)
+        {
+            put_value(2, value.value);
+        }
+
         auto Name() const
         {
             return get_string(3);
+        }
+
+        template <typename T>
+        void Name(T&& str)
+        {
+            put_string(3, std::forward<T>(str));
         }
 
         MethodDefSig Signature() const
@@ -110,7 +187,11 @@ namespace winmd::reader
             return{ get_database(), cursor };
         }
 
+        void Signature(MethodDefSig const& value);
+
         auto ParamList() const;
+        void ParamList(Param const& value);
+
         auto CustomAttribute() const;
         auto Parent() const;
         auto GenericParam() const;

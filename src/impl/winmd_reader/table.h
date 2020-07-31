@@ -6,7 +6,7 @@ namespace winmd::reader
 
     struct table_base
     {
-        explicit table_base(database const* database) noexcept : m_database(database)
+        explicit table_base(database const* database, bool writeable = false) noexcept : m_database(database), m_writeable(writeable)
         {
         }
 
@@ -17,7 +17,15 @@ namespace winmd::reader
 
         uint32_t size() const noexcept
         {
-            return m_row_count;
+            if (m_writeable)
+            {
+                XLANG_ASSERT(m_writeable_data.size() % m_row_size == 0);
+                return static_cast<uint32_t>(m_writeable_data.size()) / m_row_size;
+            }
+            else
+            {
+                return m_row_count;
+            }
         }
 
         uint32_t row_size() const noexcept
@@ -43,10 +51,10 @@ namespace winmd::reader
                 impl::throw_invalid("Invalid row index");
             }
 
-            uint8_t const* ptr = m_data + row * m_row_size + m_columns[column].offset;
+            uint8_t const* ptr = data() + row * m_row_size + m_columns[column].offset;
             switch (data_size)
             {
-            case  1:
+            case 1:
             {
                 uint8_t temp = *ptr;
                 return static_cast<T>(temp);
@@ -69,6 +77,54 @@ namespace winmd::reader
             }
         }
 
+        template <typename T>
+        void put_value(uint32_t const row, uint32_t const column, T value)
+        {
+            static_assert(std::is_enum_v<T> || std::is_integral_v<T>);
+            uint32_t const data_size = m_columns[column].size;
+            XLANG_ASSERT(data_size == 1 || data_size == 2 || data_size == 4 || data_size == 8);
+            XLANG_ASSERT(sizeof(T) <= data_size);
+            
+            XLANG_ASSERT(m_writeable);
+
+            if (row > size())
+            {
+                impl::throw_invalid("Invalid row index");
+            }
+
+            uint8_t* ptr = data() + row * m_row_size + m_columns[column].offset;
+            switch (data_size)
+            {
+            case 1:
+            {
+                uint8_t& temp = *ptr;
+                temp = static_cast<uint8_t>(value);
+            }
+            case 2:
+            {
+                uint16_t& temp = *reinterpret_cast<uint16_t*>(ptr);
+                temp = static_cast<uint16_t>(value);
+            }
+            case 4:
+            {
+                uint32_t& temp = *reinterpret_cast<uint32_t*>(ptr);
+                temp = static_cast<uint32_t>(value);
+            }
+            default:
+            {
+                uint64_t& temp = *reinterpret_cast<uint64_t*>(ptr);
+                temp = static_cast<uint64_t>(value);
+            }
+            }
+        }
+
+        uint32_t add_row()
+        {
+            XLANG_ASSERT(m_writeable);
+            m_writeable_data.insert(m_writeable_data.end(), m_row_size, 0);
+            return size() - 1;
+        }
+
     private:
 
         friend database;
@@ -79,15 +135,45 @@ namespace winmd::reader
             uint8_t size;
         };
 
+        uint8_t const* data() const noexcept
+        {
+            if (m_writeable)
+            {
+                XLANG_ASSERT(m_writeable_data.size() % m_row_size == 0);
+                return m_writeable_data.data();
+            }
+            else
+            {
+                return m_data;
+            }
+        }
+
+        uint8_t* data() noexcept
+        {
+            XLANG_ASSERT(m_writeable);
+            if (m_writeable)
+            {
+                XLANG_ASSERT(m_writeable_data.size() % m_row_size == 0);
+                return m_writeable_data.data();
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
+
         database const* m_database;
         uint8_t const* m_data{};
         uint32_t m_row_count{};
         uint8_t m_row_size{};
         std::array<column, 6> m_columns{};
+        bool m_writeable{};
+        std::vector<uint8_t> m_writeable_data;
 
         void set_row_count(uint32_t const row_count) noexcept
         {
             XLANG_ASSERT(!m_row_count);
+            XLANG_ASSERT(!m_writeable);
             m_row_count = row_count;
         }
 
@@ -116,6 +202,7 @@ namespace winmd::reader
         void set_data(byte_view& view) noexcept
         {
             XLANG_ASSERT(!m_data);
+            XLANG_ASSERT(!m_writeable);
 
             if (m_row_count)
             {
@@ -127,7 +214,54 @@ namespace winmd::reader
 
         uint8_t index_size() const noexcept
         {
-            return m_row_count < (1 << 16) ? 2 : 4;
+            return size() < (1 << 16) ? 2 : 4;
+        }
+
+        std::vector<uint8_t> write_with_columns(uint8_t const a, uint8_t const b = 0, uint8_t const c = 0, uint8_t const d = 0, uint8_t const e = 0, uint8_t const f = 0) const
+        {
+            XLANG_ASSERT(a);
+            XLANG_ASSERT(a <= 8);
+            XLANG_ASSERT(b <= 8);
+            XLANG_ASSERT(c <= 8);
+            XLANG_ASSERT(d <= 8);
+            XLANG_ASSERT(e <= 8);
+            XLANG_ASSERT(f <= 8);
+
+            std::array<column, 6> final_columns;
+            auto const final_row_size = a + b + c + d + e + f;
+            XLANG_ASSERT(final_row_size < UINT8_MAX);
+            final_columns[0] = { 0, a };
+            if (b) { final_columns[1] = { static_cast<uint8_t>(a), b }; }
+            if (c) { final_columns[2] = { static_cast<uint8_t>(a + b), c }; }
+            if (d) { final_columns[3] = { static_cast<uint8_t>(a + b + c), d }; }
+            if (e) { final_columns[4] = { static_cast<uint8_t>(a + b + c + d), e }; }
+            if (f) { final_columns[5] = { static_cast<uint8_t>(a + b + c + d + e), f }; }
+
+            for (size_t i = 0; i < 6; ++i)
+            {
+                XLANG_ASSERT((m_columns[i].size == 0) == (final_columns[i].size == 0));
+            }
+
+            const auto final_row_count = size();
+
+            std::vector<uint8_t> result;
+            result.resize(final_row_count * final_row_size);
+
+            auto src_data = m_writeable_data.begin();
+            auto dst_data = result.begin();
+
+            for (uint32_t row = 0; row < final_row_count; ++row)
+            {
+                for (uint32_t col = 0; col < 6; ++col)
+                {
+                    std::copy_n(src_data + m_columns[col].offset,
+                        final_columns[col].size,
+                        dst_data + m_columns[col].offset);
+                }
+                src_data += m_row_size;
+                dst_data += final_row_size;
+            }
+            return result;
         }
     };
 
@@ -186,6 +320,11 @@ namespace winmd::reader
             return m_database;
         }
 
+        uint32_t raw_value() const noexcept
+        {
+            return m_value;
+        }
+
     protected:
 
         database const& m_database{};
@@ -232,7 +371,11 @@ namespace winmd::reader
         using reference = value_type&;
         using const_reference = value_type const&;
 
-        row_base(table_base const* const table, uint32_t const index) noexcept : m_table(table), m_index(index)
+        row_base(table_base* table, uint32_t const index) noexcept : m_table(table), m_index(index)
+        {
+        }
+
+        row_base(table_base const* table, uint32_t const index) noexcept : row_base(const_cast<table_base*>(table), index)
         {
         }
 
@@ -252,6 +395,13 @@ namespace winmd::reader
         {
             XLANG_ASSERT(*this);
             return m_table->get_value<T>(m_index, column);
+        }
+
+        template <typename T>
+        void put_value(uint32_t const column, T value) const
+        {
+            XLANG_ASSERT(*this);
+            return m_table->put_value<T>(m_index, column, value);
         }
 
         template <typename T>
@@ -379,11 +529,26 @@ namespace winmd::reader
         byte_view get_blob(uint32_t const column) const;
 
         template <typename T>
+        void put_string(uint32_t const column, T&& str);
+
+        template <typename T>
         auto get_coded_index(uint32_t const column) const
         {
             return reader::coded_index<T>{ m_table->get_database(), m_table->get_value<uint32_t>(m_index, column) };
         }
 
+        template <typename T>
+        void put_coded_index(uint32_t column, reader::coded_index<T> const& value)
+        {
+            m_table->put_value(m_index, column, value.raw_value());
+        }
+
+        template <typename T>
+        void put_row(uint32_t column, row_base<T> const& value)
+        {
+            m_table->put_value(m_index, column, value.index() + 1);
+        }
+            
         table_base const* get_table() const noexcept
         {
             return m_table;
@@ -391,7 +556,7 @@ namespace winmd::reader
 
     private:
 
-        table_base const* m_table{};
+        table_base* m_table{};
         uint32_t m_index{};
     };
 
@@ -407,7 +572,17 @@ namespace winmd::reader
             return { this, 0 };
         }
 
+        T begin() noexcept
+        {
+            return { this, 0 };
+        }
+
         T end() const noexcept
+        {
+            return { this, size() };
+        }
+
+        T end() noexcept
         {
             return { this, size() };
         }
@@ -415,6 +590,16 @@ namespace winmd::reader
         T operator[](uint32_t const row) const noexcept
         {
             return { this, row };
+        }
+
+        T operator[](uint32_t const row) noexcept
+        {
+            return { this, row };
+        }
+
+        T add_row() noexcept
+        {
+            return { this, table_base::add_row() };
         }
     };
 }

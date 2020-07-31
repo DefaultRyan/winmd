@@ -184,6 +184,12 @@ namespace winmd::reader
             return { reinterpret_cast<char const*>(view.begin()), static_cast<uint32_t>(last - view.begin()) };
         }
 
+        template <typename T>
+        uint32_t put_string(T&& str)
+        {
+            return m_writeable_strings.put_string(std::forward<T>(str));
+        }
+
         byte_view get_blob(uint32_t const index) const
         {
             auto view = m_blobs.seek(index);
@@ -531,6 +537,9 @@ namespace winmd::reader
         byte_view m_blobs;
         byte_view m_guids;
         cache const* m_cache;
+
+        writer::string_heap m_writeable_strings;
+        writer::blob_heap m_writeable_blobs;
     };
 
     template <typename Row>
@@ -543,6 +552,14 @@ namespace winmd::reader
     inline std::string_view row_base<Row>::get_string(uint32_t const column) const
     {
         return get_database().get_string(m_table->get_value<uint32_t>(m_index, column));
+    }
+
+    template <typename Row>
+    template <typename T>
+    inline void row_base<Row>::put_string(uint32_t const column, T&& str)
+    {
+        uint32_t value = get_database().put_string(std::forward<T>(str));
+        m_table->put_value(m_index, column, value);
     }
 
     template <>

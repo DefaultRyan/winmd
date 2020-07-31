@@ -12,6 +12,7 @@
 #endif
 
 #include <stdexcept>
+#include <algorithm>
 #include <assert.h>
 #include <array>
 #include <bitset>
